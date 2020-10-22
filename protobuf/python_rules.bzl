@@ -35,7 +35,7 @@ _GENERATED_GRPC_PROTO_FORMAT = "{}_pb2_grpc.py"
 def _generate_py_impl(ctx):
     protos, includes = protos_from_context(ctx)
 
-    out_dir = get_protoc_out_dir(ctx, protos)
+    out_dir = get_protoc_out_dir(ctx)
     out_files = declare_out_files(ctx, protos, _GENERATED_PROTO_FORMAT)
     tools = [ctx.executable._protoc]
 
@@ -56,7 +56,6 @@ def _generate_py_impl(ctx):
     ] + get_protoc_compile_targets(protos, ctx.genfiles_dir.path)
 
     imports = ["{}/{}".format(ctx.workspace_name, ctx.label.package)]
-
     ctx.actions.run(
         inputs = protos + includes,
         tools = tools,
@@ -78,7 +77,7 @@ def _generate_py_impl(ctx):
 def _generate_pb2_grpc_src_impl(ctx):
     protos, includes = protos_from_context(ctx)
 
-    out_dir = get_protoc_out_dir(ctx, protos)
+    out_dir = get_protoc_out_dir(ctx)
     out_files = declare_out_files(ctx, protos, _GENERATED_GRPC_PROTO_FORMAT)
     tools = [ctx.executable._protoc, ctx.executable._grpc_plugin]
     plugin_flags = ["grpc_2_0"] + ctx.attr.strip_prefixes

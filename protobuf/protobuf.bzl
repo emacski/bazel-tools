@@ -119,22 +119,19 @@ def get_protoc_plugin_args(plugin, flags, dir_out, gen_mocks, plugin_name):
     ]
 
 
-def get_protoc_out_dir(ctx, protos):
+def get_protoc_out_dir(ctx):
     """compute value for --python_out= protoc argument
 
     Args:
         ctx: rule context
-        protos: list of proto `File`s
     Returns:
         output directory for protoc (string)
     """
     out_path_parts = [ctx.genfiles_dir.path]
+    # handle workspace_root like 'external/[repo]'
     if ctx.label.workspace_root:
         out_path_parts.append(ctx.label.workspace_root)
-    for proto in protos:
-        if _is_in_virtual_imports(proto):
-            out_path_parts.append(ctx.label.package)
-            break
+    out_path_parts.append(ctx.label.package)
     return "/".join(out_path_parts)
 
 
