@@ -20,8 +20,6 @@ load(
     real_proto_library = "proto_library",
 )
 
-ProtoMetaInfo = provider("Protobuf Metadata", fields = ["go_package_map"])
-
 WELL_KNOWN_PROTOS = {
     "@com_google_protobuf//:any_proto": "google/protobuf/any.proto",
     "@com_google_protobuf//:api_proto": "google/protobuf/api.proto",
@@ -36,6 +34,45 @@ WELL_KNOWN_PROTOS = {
     "@com_google_protobuf//:type_proto": "google/protobuf/type.proto",
     "@com_google_protobuf//:wrappers_proto": "google/protobuf/wrappers.proto",
 }
+
+ProtoMetaInfo = provider("Protobuf Metadata", fields = ["go_package_map"])
+
+def _go_package_map(ctx):
+    src_files = ctx.attr.proto_library[ProtoInfo].check_deps_sources.to_list()
+    package_map = {src.short_path: ctx.attr.go_package for src in src_files}
+
+    for dep in ctx.attr.deps:
+        if ProtoMetaInfo not in dep:
+            continue
+        for short_path, go_pkg in dep[ProtoMetaInfo].go_package_map.items():
+            if short_path not in package_map:
+                package_map[short_path] = go_pkg
+
+    return package_map
+
+def _meta_proto_library_impl(ctx):
+    go_package_map = _go_package_map(ctx)
+    return [
+        ctx.attr.proto_library[ProtoInfo],
+        ProtoMetaInfo(
+            go_package_map = go_package_map,
+        ),
+    ]
+
+_meta_proto_library = rule(
+    attrs = {
+        "srcs": attr.label_list(
+            allow_files = True,
+        ),
+        "deps": attr.label_list(),
+        "proto_library": attr.label(
+            mandatory = True,
+            providers = [ProtoInfo],
+        ),
+        "go_package": attr.string(),
+    },
+    implementation = _meta_proto_library_impl,
+)
 
 def proto_library(
         name,
@@ -75,47 +112,9 @@ def proto_library(
         **kwargs
     )
 
-    meta_proto_library(
+    _meta_proto_library(
         name = name,
         deps = deps,
         proto_library = real_proto_target,
         go_package = go_package,
     )
-
-def _go_package_map(ctx):
-    src_files = ctx.attr.proto_library[ProtoInfo].check_deps_sources.to_list()
-    package_map = {src.short_path: ctx.attr.go_package for src in src_files}
-
-    for dep in ctx.attr.deps:
-        if ProtoMetaInfo not in dep:
-            continue
-        for short_path, go_pkg in dep[ProtoMetaInfo].go_package_map.items():
-            if short_path not in package_map:
-                package_map[short_path] = go_pkg
-
-    return package_map
-
-def _meta_proto_library_impl(ctx):
-    go_package_map = _go_package_map(ctx)
-
-    return [
-        ctx.attr.proto_library[ProtoInfo],
-        ProtoMetaInfo(
-            go_package_map = go_package_map,
-        ),
-    ]
-
-meta_proto_library = rule(
-    attrs = {
-        "srcs": attr.label_list(
-            allow_files = True,
-        ),
-        "deps": attr.label_list(),
-        "proto_library": attr.label(
-            mandatory = True,
-            providers = [ProtoInfo],
-        ),
-        "go_package": attr.string(),
-    },
-    implementation = _meta_proto_library_impl,
-)

@@ -16,104 +16,80 @@
 
 load("@rules_proto//proto:defs.bzl", "ProtoInfo")
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load(":protoc.bzl", "protoc_gen_sources")
+load(":protoc.bzl", "protoc_gen_sources", "append_codegen_suffix")
 
-def cc_proto_library(
-        name,
-        deps = [],
-        plugin = None,
-        plugin_name = None,
-        plugin_flags = None,
-        **kwargs):
-    """Macro to generate c++ source code from protobufs.
+_PROTO_HDR_FMT = "{}.pb.h"
+_PROTO_SRC_FMT = "{}.pb.cc"
+_GRPC_PROTO_HDR_FMT = "{}.grpc.pb.h"
+_GRPC_PROTO_SRC_FMT = "{}.grpc.pb.cc"
 
-    Args:
-      name: unique name for this rule
-      deps: a single element list containing a `proto_library`
-      plugin: an optional custom protoc plugin to execute together with
-        generating the gRPC code
-      plugin_name: the name used to invoke the plugin (might be different from
-        the label used to identify the executable, see `plugin`)
-      plugin_flags: list of string flags to pass to the plugin
-      **kwargs: additional arguments to be supplied to the invocation of
-        `cc_library`
-    """
-    codegen_name = "_{}_codegen".format(name)
-    codegen_target = ":{}".format(codegen_name)
+def _cc_proto_souces_impl(ctx):
+    return _protoc_gen_cc_sources(ctx, [
+        _PROTO_HDR_FMT,
+        _PROTO_SRC_FMT,
+    ])
 
-    if len(deps) != 1:
-        fail("deps cannot be empty")
+_cc_proto_souces = rule(
+    attrs = {
+        "deps": attr.label_list(
+            mandatory = True,
+            allow_empty = False,
+            providers = [ProtoInfo],
+        ),
+        "plugin": attr.label(
+            default = Label("@com_google_protobuf//:protoc"),
+            executable = True,
+            providers = ["files_to_run"],
+            cfg = "host",
+        ),
+        "plugin_name": attr.string(
+            default = "cpp",
+        ),
+        "plugin_flags": attr.string_list(default = []),
+        "plugin_opts": attr.string_list(default = []),
+        "_protoc": attr.label(
+            default = Label("@com_google_protobuf//:protoc"),
+            executable = True,
+            providers = ["files_to_run"],
+            cfg = "host",
+        ),
+    },
+    implementation = _cc_proto_souces_impl,
+)
 
-    _generate_pb_src(
-        name = codegen_name,
-        deps = deps,
-        plugin = plugin,
-        plugin_name = plugin_name,
-        plugin_flags = plugin_flags,
-    )
+def _cc_grpc_souces_impl(ctx):
+    return _protoc_gen_cc_sources(ctx, [
+        _GRPC_PROTO_HDR_FMT,
+        _GRPC_PROTO_SRC_FMT,
+    ], grpc = True)
 
-    cc_library(
-        name = name,
-        srcs = [codegen_target],
-        hdrs = [codegen_target],
-        deps = [
-            codegen_target,
-            "@com_google_protobuf//:protobuf",
-        ],
-        **kwargs
-    )
-
-def cc_grpc_library(
-        name,
-        srcs = [],
-        deps = [],
-        plugin = None,
-        plugin_name = None,
-        plugin_flags = None,
-        **kwargs):
-    """Macro to generate c++ source code from protobuf defined gRPC services.
-
-    Args:
-      name: unique name for this rule
-      srcs: a single element list containing the `proto_library` target that
-        declares the grpc service sources
-      deps: a single element list containing a `cc_proto_library` target
-        representing the protobuf dependencies of the grpc service
-      plugin: an optional custom protoc plugin to execute together with
-        generating the gRPC code
-      plugin_name: the name used to invoke the plugin (might be different from
-        the label used to identify the executable, see `plugin`)
-      plugin_flags: list of string flags to pass to the plugin
-      **kwargs: additional arguments to be supplied to the invocation of
-        `cc_library`
-    """
-    codegen_grpc_name = "_{}_grpc_codegen".format(name)
-    codegen_grpc_target = ":{}".format(codegen_grpc_name)
-
-    if len(srcs) != 1:
-        fail("Can only compile a single proto at a time.")
-
-    if len(deps) != 1:
-        fail("deps cannot be empty")
-
-    _generate_pb_grpc_src(
-        name = codegen_grpc_name,
-        deps = srcs,
-        plugin = plugin,
-        plugin_name = plugin_name,
-        plugin_flags = plugin_flags,
-    )
-
-    cc_library(
-        name = name,
-        srcs = [codegen_grpc_target],
-        hdrs = [codegen_grpc_target],
-        deps = deps + [
-            "@com_github_grpc_grpc//:grpc++",
-            "@com_github_grpc_grpc//:grpc++_codegen_proto",
-        ],
-        **kwargs
-    )
+_cc_grpc_souces = rule(
+    attrs = {
+        "deps": attr.label_list(
+            mandatory = True,
+            allow_empty = False,
+            providers = [ProtoInfo],
+        ),
+        "plugin": attr.label(
+            default = Label("@com_github_grpc_grpc//src/compiler:grpc_cpp_plugin"),
+            executable = True,
+            providers = ["files_to_run"],
+            cfg = "host",
+        ),
+        "plugin_name": attr.string(
+            default = "grpc",
+        ),
+        "plugin_flags": attr.string_list(default = []),
+        "plugin_opts": attr.string_list(default = []),
+        "_protoc": attr.label(
+            default = Label("@com_google_protobuf//:protoc"),
+            executable = True,
+            providers = ["files_to_run"],
+            cfg = "host",
+        ),
+    },
+    implementation = _cc_grpc_souces_impl,
+)
 
 def _protoc_gen_cc_sources(ctx, fmts, grpc = False):
     generated_srcs = protoc_gen_sources(
@@ -147,75 +123,107 @@ def _protoc_gen_cc_sources(ctx, fmts, grpc = False):
         )),
     ]
 
-_PROTO_HDR_FMT = "{}.pb.h"
-_PROTO_SRC_FMT = "{}.pb.cc"
-_GRPC_PROTO_HDR_FMT = "{}.grpc.pb.h"
-_GRPC_PROTO_SRC_FMT = "{}.grpc.pb.cc"
+def cc_proto_souces(**kwargs):
+    """Macro to generate c++ sources from protobufs"""
+    _cc_proto_souces(**kwargs)
 
-def _generate_pb_src_impl(ctx):
-    return _protoc_gen_cc_sources(ctx, [
-        _PROTO_HDR_FMT,
-        _PROTO_SRC_FMT,
-    ])
+def cc_grpc_sources(**kwargs):
+    """Macro to generate c++ sources from protobuf defined gRPC services"""
+    _cc_grpc_souces(**kwargs)
 
-_generate_pb_src = rule(
-    attrs = {
-        "deps": attr.label_list(
-            mandatory = True,
-            allow_empty = False,
-            providers = [ProtoInfo],
-        ),
-        "plugin": attr.label(
-            default = Label("@com_google_protobuf//:protoc"),
-            executable = True,
-            providers = ["files_to_run"],
-            cfg = "host",
-        ),
-        "plugin_name": attr.string(
-            default = "cpp",
-        ),
-        "plugin_flags": attr.string_list(default = []),
-        "plugin_opts": attr.string_list(default = []),
-        "_protoc": attr.label(
-            default = Label("@com_google_protobuf//:protoc"),
-            executable = True,
-            providers = ["files_to_run"],
-            cfg = "host",
-        ),
-    },
-    implementation = _generate_pb_src_impl,
-)
+def cc_proto_library(
+        name,
+        deps = [],
+        plugin = None,
+        plugin_name = None,
+        plugin_flags = None,
+        **kwargs):
+    """Macro to generate c++ library from protobufs.
 
-def _generate_pb_grpc_src_impl(ctx):
-    return _protoc_gen_cc_sources(ctx, [
-        _GRPC_PROTO_HDR_FMT,
-        _GRPC_PROTO_SRC_FMT,
-    ], grpc = True)
+    Args:
+      name: unique name for this rule
+      deps: a single element list containing a `proto_library`
+      plugin: an optional custom protoc plugin to execute together with
+        generating the gRPC code
+      plugin_name: the name used to invoke the plugin (might be different from
+        the label used to identify the executable, see `plugin`)
+      plugin_flags: list of string flags to pass to the plugin
+      **kwargs: additional arguments to be supplied to the invocation of
+        `cc_library`
+    """
+    codegen_name = append_codegen_suffix(name)
+    codegen_target = ":{}".format(codegen_name)
 
-_generate_pb_grpc_src = rule(
-    attrs = {
-        "deps": attr.label_list(
-            mandatory = True,
-            allow_empty = False,
-            providers = [ProtoInfo],
-        ),
-        "plugin": attr.label(
-            default = Label("@com_github_grpc_grpc//src/compiler:grpc_cpp_plugin"),
-            executable = True,
-            providers = ["files_to_run"],
-            cfg = "host",
-        ),
-        "plugin_name": attr.string(
-            default = "grpc",
-        ),
-        "plugin_flags": attr.string_list(default = []),
-        "plugin_opts": attr.string_list(default = []),
-        "_protoc": attr.label(
-            default = Label("@com_google_protobuf//:protoc"),
-            executable = True,
-            providers = ["files_to_run"],
-            cfg = "host",
-        ),
-    },
-    implementation = _generate_pb_grpc_src_impl,
-)
+    if len(deps) != 1:
+        fail("deps cannot be empty")
+
+    _cc_proto_souces(
+        name = codegen_name,
+        deps = deps,
+        plugin = plugin,
+        plugin_name = plugin_name,
+        plugin_flags = plugin_flags,
+    )
+
+    cc_library(
+        name = name,
+        srcs = [codegen_target],
+        hdrs = [codegen_target],
+        deps = [
+            codegen_target,
+            "@com_google_protobuf//:protobuf",
+        ],
+        **kwargs
+    )
+
+def cc_grpc_library(
+        name,
+        srcs = [],
+        deps = [],
+        plugin = None,
+        plugin_name = None,
+        plugin_flags = None,
+        **kwargs):
+    """Macro to generate c++ library from protobuf defined gRPC services.
+
+    Args:
+      name: unique name for this rule
+      srcs: a single element list containing the `proto_library` target that
+        declares the grpc service sources
+      deps: a single element list containing a `cc_proto_library` target
+        representing the protobuf dependencies of the grpc service
+      plugin: an optional custom protoc plugin to execute together with
+        generating the gRPC code
+      plugin_name: the name used to invoke the plugin (might be different from
+        the label used to identify the executable, see `plugin`)
+      plugin_flags: list of string flags to pass to the plugin
+      **kwargs: additional arguments to be supplied to the invocation of
+        `cc_library`
+    """
+    codegen_name = append_codegen_suffix(name)
+    codegen_target = ":{}".format(codegen_name)
+
+    if len(srcs) != 1:
+        fail("Can only compile a single proto at a time.")
+
+    if len(deps) != 1:
+        fail("deps cannot be empty")
+
+    _cc_grpc_souces(
+        name = codegen_name,
+        deps = srcs,
+        plugin = plugin,
+        plugin_name = plugin_name,
+        plugin_flags = plugin_flags,
+    )
+
+    cc_library(
+        name = name,
+        srcs = [codegen_target],
+        hdrs = [codegen_target],
+        deps = deps + [
+            "@com_github_grpc_grpc//:grpc++",
+            "@com_github_grpc_grpc//:grpc++_codegen_proto",
+        ],
+        **kwargs
+    )

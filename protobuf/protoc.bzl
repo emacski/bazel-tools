@@ -17,6 +17,7 @@
 load("@rules_proto//proto:defs.bzl", "ProtoInfo")
 load(":proto.bzl", "ProtoMetaInfo", "WELL_KNOWN_PROTOS")
 
+_CODEGEN_SUFFIX = "codegen"
 _PROTO_EXTENSION = ".proto"
 _VIRTUAL_IMPORTS = "/_virtual_imports/"
 _BUILTINS_PLUGIN = "protoc"
@@ -39,6 +40,10 @@ def _virtual_import_short_path(proto_file):
         # everything after [_VIRTUAL_IMPORTS]/[proto_library_rule_name]
         short_path = short_path.split("/", 2)[2]
     return short_path
+
+def append_codegen_suffix(name):
+    """append the codegen suffix to a name"""
+    return "_".join([name, _CODEGEN_SUFFIX])
 
 def sources_from_proto_target(proto_target):
     """get protos sources (direct, and transitive) from target
