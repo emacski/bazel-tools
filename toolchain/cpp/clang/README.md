@@ -93,7 +93,7 @@ Specify the following on the command line or in a `.bazelrc` file when building:
 This toolchain provides a make var target for genrules to help facilitate
 genrule cross-building when required.
 
-**Target:** `//tools/cpp/clang:current_cc_toolchain`
+**Target:** `//toolchain/cpp/clang:current_cc_toolchain`
 
 Example
 ```
@@ -107,7 +107,7 @@ genrule(
         "echo 'TARGET_GNU_SYSTEM_NAME=$(TARGET_GNU_SYSTEM_NAME)' >> $(OUTS)",
     ]),
     toolchains = [
-      "@com_gitlab_emacski_bazeltools//tools/cpp/clang:current_cc_toolchain"
+      "@com_gitlab_emacski_bazeltools//toolchain/cpp/clang:current_cc_toolchain"
     ],
 )
 ```
