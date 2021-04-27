@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Clang cross-compile toolchain config rule."""
+
 load(
     "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
     "feature",
@@ -29,6 +30,13 @@ load(
 )
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 
+CPU_ARMHF = "arm"
+CPU_AARCH64 = "aarch64"
+CPU_X86_64 = "x86_64"
+
+def _is_any_arm(cpu):
+    return cpu == CPU_ARMHF or cpu == CPU_AARCH64
+
 def _impl(ctx):
     toolchain_identifier = "clang-linux-cross"
     compiler_version = ctx.attr.clang_version
@@ -39,13 +47,13 @@ def _impl(ctx):
     target_libc = "glibc_unknown"
     target_libcpp = ctx.attr.target_libcpp[BuildSettingInfo].value
 
-    if (target_cpu == "aarch64" or target_cpu == "arm"):
+    if _is_any_arm(target_cpu):
         target_platform_gnu = target_cpu + "-linux-gnu"
-        if target_cpu == "arm":
+        if target_cpu == CPU_ARMHF:
             target_platform_gnu = target_cpu + "-linux-gnueabihf"
         sysroot = "/usr/" + target_platform_gnu
         include_path_prefix = sysroot
-    elif (target_cpu == "x86_64"):
+    elif target_cpu == CPU_X86_64:
         target_platform_gnu = target_cpu + "-unknown-linux-gnu"
         sysroot = "/"
         include_path_prefix = "/usr"
@@ -53,7 +61,7 @@ def _impl(ctx):
         fail("Unreachable")
 
     if (target_libcpp == "libstdc++"):
-        if (target_cpu == "aarch64" or target_cpu == "arm"):
+        if _is_any_arm(target_cpu):
             cross_system_include_dirs = [
                 include_path_prefix + "/include/c++/8",
                 include_path_prefix + "/include/c++/8/" + target_platform_gnu,
@@ -66,29 +74,31 @@ def _impl(ctx):
                 include_path_prefix + "/lib/clang/" + compiler_version + "/include",
                 include_path_prefix + "/include/x86_64-linux-gnu",
             ]
+    elif _is_any_arm(target_cpu):
+        cross_system_include_dirs = [
+            include_path_prefix + "/include/c++/v1",
+            include_path_prefix + "/lib/clang/" + compiler_version + "/include",
+        ]
     else:
-        if (target_cpu == "aarch64" or target_cpu == "arm"):
-            cross_system_include_dirs = [
-                include_path_prefix + "/include/c++/v1",
-                include_path_prefix + "/lib/clang/" + compiler_version + "/include",
-            ]
-        else:
-            cross_system_include_dirs = [
-                include_path_prefix + "/include/c++/v1",
-                include_path_prefix + "/lib/clang/" + compiler_version + "/include",
-                include_path_prefix + "/include/x86_64-linux-gnu",
-            ]
+        cross_system_include_dirs = [include_path_prefix + "/include/c++/v1"]
+        cross_system_include_dirs += [
+            include_path_prefix + "/lib/clang/" + compiler_version + "/include",
+            include_path_prefix + "/include/x86_64-linux-gnu",
+        ]
 
     cross_system_include_dirs += [
-        include_path_prefix + "/include/",
+        "/usr/include",
+        include_path_prefix + "/include",
         include_path_prefix + "/include/linux",
         include_path_prefix + "/include/asm",
         include_path_prefix + "/include/asm-generic",
     ]
 
-    if (target_cpu == "aarch64" or target_cpu == "arm"):
+    if _is_any_arm(target_cpu):
         cross_system_lib_dirs = [
             "/usr/" + target_platform_gnu + "/lib",
+            # for libs outside of cross arch sysroot
+            "/usr/lib/" + target_platform_gnu,
         ]
     else:
         cross_system_lib_dirs = [
@@ -96,7 +106,7 @@ def _impl(ctx):
         ]
 
     if (target_libcpp == "libstdc++"):
-        if (target_cpu == "aarch64" or target_cpu == "arm"):
+        if _is_any_arm(target_cpu):
             cross_system_lib_dirs.append("/usr/lib/gcc-cross/" + target_platform_gnu + "/8")
         else:
             cross_system_lib_dirs.append("/usr/lib/gcc/x86_64-linux-gnu/8")
@@ -275,7 +285,9 @@ def _impl(ctx):
                 actions = ALL_COMPILE_ACTIONS,
                 flag_groups = [
                     flag_group(
-                        flags = ["-fprofile-instr-generate", "-fcoverage-mapping"],
+                        flags = [
+                            "-fprofile-instr-generate",
+                            "-fcoverage-mapping"],
                     ),
                 ],
             ),
@@ -303,17 +315,21 @@ def _impl(ctx):
         coverage_feature,
     ]
 
+    tool_bin_dir = "/usr/bin/"
+    if compiler_version.startswith("11"):
+        tool_bin_dir = "/usr/lib/llvm-11/bin/"
+
     tool_paths = [
-        tool_path(name = "ld", path = "/usr/bin/ld.lld"),
-        tool_path(name = "cpp", path = "/usr/bin/clang-cpp"),
-        tool_path(name = "dwp", path = "/usr/bin/llvm-dwp"),
-        tool_path(name = "gcov", path = "/usr/bin/llvm-profdata"),
-        tool_path(name = "nm", path = "/usr/bin/llvm-nm"),
-        tool_path(name = "objcopy", path = "/usr/bin/llvm-objcopy"),
-        tool_path(name = "objdump", path = "/usr/bin/llvm-objdump"),
-        tool_path(name = "strip", path = "/usr/bin/strip"),
-        tool_path(name = "gcc", path = "/usr/bin/clang"),
-        tool_path(name = "ar", path = "/usr/bin/llvm-ar"),
+        tool_path(name = "ld", path = tool_bin_dir + "ld.lld"),
+        tool_path(name = "cpp", path = tool_bin_dir + "clang-cpp"),
+        tool_path(name = "dwp", path = tool_bin_dir + "llvm-dwp"),
+        tool_path(name = "gcov", path = tool_bin_dir + "llvm-profdata"),
+        tool_path(name = "nm", path = tool_bin_dir + "llvm-nm"),
+        tool_path(name = "objcopy", path = tool_bin_dir + "llvm-objcopy"),
+        tool_path(name = "objdump", path = tool_bin_dir + "llvm-objdump"),
+        tool_path(name = "strip", path = tool_bin_dir + "strip"),
+        tool_path(name = "gcc", path = tool_bin_dir + "clang"),
+        tool_path(name = "ar", path = tool_bin_dir + "llvm-ar"),
     ]
 
     return [cc_common.create_cc_toolchain_config_info(
@@ -336,7 +352,10 @@ cc_toolchain_config = rule(
     implementation = _impl,
     attrs = {
         "clang_version": attr.string(mandatory = True),
-        "target_cpu": attr.string(mandatory = True, values = ["arm", "aarch64", "x86_64"]),
+        "target_cpu": attr.string(
+            mandatory = True,
+            values = [CPU_ARMHF, CPU_AARCH64, CPU_X86_64],
+        ),
         "target_libcpp": attr.label(),
     },
     provides = [CcToolchainConfigInfo],
