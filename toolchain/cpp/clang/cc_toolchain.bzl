@@ -134,14 +134,14 @@ def cc_cross_toolchain_bundle(
     """
     legacy_toolchain_map = {}
 
-    for cpu, bzl_cpu in BAZEL_CPU_MAP.items():
-        compiler_name = name + "-compiler-k8-to-" + bzl_cpu
+    for bzl_cpu, cpu in BAZEL_CPU_MAP.items():
+        compiler_name = name + "-compiler-x86_64-to-" + cpu
         toolchain_name = name + "-toolchain-x86_64-to-" + cpu
 
         cc_cross_toolchain(
             name = compiler_name,
             clang_version = clang_version,
-            target_cpu = cpu,
+            target_cpu = bzl_cpu,
             target_libcpp = target_libcpp,
         )
 

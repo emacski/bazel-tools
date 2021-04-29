@@ -25,6 +25,7 @@ aid out in the exact manner as represented by the next example
 FROM debian:buster
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        curl ca-certificates \
         gcc g++ \
         gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
         gcc-aarch64-linux-gnu g++-aarch64-linux-gnu && \
@@ -87,6 +88,14 @@ Specify the following on the command line or in a `.bazelrc` file when building:
 --incompatible_enable_cc_toolchain_resolution
 ```
 
+Specify target platform for building with bazel:
+```sh
+# linux_arm64
+bazel build --platforms=@com_github_emacski_bazeltools//toolchain:linux_arm64 [TARGETS...]
+# linux_arm
+bazel build --platforms=@com_github_emacski_bazeltools//toolchain:linux_arm [TARGETS...]
+```
+
 ### Legacy Toolchain Resolution (CROSSTOOL)
 
 Specify the following on the command line or in a `.bazelrc` file when building:
@@ -96,13 +105,13 @@ Specify the following on the command line or in a `.bazelrc` file when building:
 --cpu=aarch64
 # clang 10 linux_arm
 --crosstool_top=@com_gitlab_emacski_bazeltools//toolchain/cpp/clang:clang10_crosstool
---cpu=arm
+--cpu=armhf
 # clang 11 linux_arm64
 --crosstool_top=@com_gitlab_emacski_bazeltools//toolchain/cpp/clang:clang11_crosstool
 --cpu=aarch64
 # clang 11 linux_arm
 --crosstool_top=@com_gitlab_emacski_bazeltools//toolchain/cpp/clang:clang11_crosstool
---cpu=arm
+--cpu=armhf
 ```
 
 ### Genrule Make Variables

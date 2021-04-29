@@ -30,12 +30,12 @@ load(
 )
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 
-CPU_ARMHF = "arm"
-CPU_AARCH64 = "aarch64"
-CPU_X86_64 = "x86_64"
+ARMHF = "armhf"
+AARCH64 = "aarch64"
+X86_64 = "k8"
 
 def _is_any_arm(cpu):
-    return cpu == CPU_ARMHF or cpu == CPU_AARCH64
+    return cpu == ARMHF or cpu == AARCH64
 
 def _impl(ctx):
     toolchain_identifier = "clang-linux-cross"
@@ -48,13 +48,13 @@ def _impl(ctx):
     target_libcpp = ctx.attr.target_libcpp[BuildSettingInfo].value
 
     if _is_any_arm(target_cpu):
-        target_platform_gnu = target_cpu + "-linux-gnu"
-        if target_cpu == CPU_ARMHF:
-            target_platform_gnu = target_cpu + "-linux-gnueabihf"
+        target_platform_gnu = "aarch64-linux-gnu"
+        if target_cpu == ARMHF:
+            target_platform_gnu = "arm-linux-gnueabihf"
         sysroot = "/usr/" + target_platform_gnu
         include_path_prefix = sysroot
-    elif target_cpu == CPU_X86_64:
-        target_platform_gnu = target_cpu + "-unknown-linux-gnu"
+    elif target_cpu == X86_64:
+        target_platform_gnu = "x86_64-unknown-linux-gnu"
         sysroot = "/"
         include_path_prefix = "/usr"
     else:
@@ -341,7 +341,7 @@ def _impl(ctx):
         compiler = compiler,
         cxx_builtin_include_directories = cross_system_include_dirs,
         host_system_name = "x86_64-unknown-linux-gnu",
-        target_cpu = target_cpu,
+        target_cpu = target_platform_gnu.split("-")[0],
         target_libc = target_libc,
         target_system_name = target_platform_gnu,
         tool_paths = tool_paths,
@@ -354,7 +354,7 @@ cc_toolchain_config = rule(
         "clang_version": attr.string(mandatory = True),
         "target_cpu": attr.string(
             mandatory = True,
-            values = [CPU_ARMHF, CPU_AARCH64, CPU_X86_64],
+            values = [ARMHF, AARCH64, X86_64],
         ),
         "target_libcpp": attr.label(),
     },

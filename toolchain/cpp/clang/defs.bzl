@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# map common cpu names to bazel cpu names
-BAZEL_CPU_MAP = {"x86_64": "k8", "aarch64": "aarch64", "arm": "arm"}
+# map bazel cpu names to common cpu names
+BAZEL_CPU_MAP = {"k8": "x86_64", "aarch64": "aarch64", "armhf": "arm"}
 
 def register_clang_cross_toolchains(clang_version = None):
     """Register the cross-compile toolchains of the supplied `clang_version`
@@ -28,6 +28,6 @@ def register_clang_cross_toolchains(clang_version = None):
             version = clang_version,
             cpu = cpu,
         )
-        for cpu in BAZEL_CPU_MAP.keys()
+        for cpu in BAZEL_CPU_MAP.values()
     ]
     native.register_toolchains(*toolchain_targets)

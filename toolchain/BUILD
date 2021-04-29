@@ -18,6 +18,8 @@
 
 package(default_visibility = ["//visibility:public"])
 
+# toolchain supported platforms
+
 platform(
     name = "linux_amd64",
     constraint_values = [
